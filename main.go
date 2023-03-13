@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 )
 
 func main() {
@@ -36,6 +38,10 @@ func main() {
 
 	// Parse the input flags and arguments
 	flag.Parse()
+	// If the verbose flag is set, print the input flags
+	if verbose {
+		fmt.Printf("Input flags:\n  -i | --ip\t%s\n  -I | --ip-list\t%s\n  -c | --cidr\t%s\n  -C | --cidr-list\t%s\n  -o | --output\t%s\n  -v | --verbose\t%v\n  -h | --help\t%v\n", ip, ipList, cidr, cidrList, outputFile, verbose, help)
+	}
 
 	// If the help flag is set, print the help menu and exit
 	if help {
@@ -49,15 +55,17 @@ func main() {
 		fmt.Println("Use -h or --help for more information")
 		os.Exit(1)
 	}
-	if (ip == "" && ipList == "") || (ip == "" && cidr == "") || (ip == "" && cidrList == "") || (ipList == "" && cidr == "") || (ipList == "" && cidrList == "") || (cidr == "" && cidrList == "") {
+
+	if (ip != "" && ipList != "") || (ip != "" && cidr != "") || (ip != "" && cidrList != "") || (ipList != "" && cidr != "") || (ipList != "" && cidrList != "") || (cidr != "" && cidrList != "") {
 		fmt.Println("[-] You can use one of the (-c | --cidr), (-i | --ip), (-I | --ip-list), (-C | --cidr-list) flags!")
 		fmt.Println("[!] Use -h or --help for more information")
 		os.Exit(1)
 	}
 
-	// If the verbose flag is set, print the input flags
-	if verbose {
-		fmt.Printf("Input flags:\n  -i | --ip\t%s\n  -I | --ip-list\t%s\n  -c | --cidr\t%s\n  -C | --cidr-list\t%s\n  -o | --output\t%s\n  -v | --verbose\t%v\n  -h | --help\t%v\n", ip, ipList, cidr, cidrList, outputFile, verbose, help)
+	if ping(ip) {
+		fmt.Println("[!] Yes, it's active !")
+	} else {
+		fmt.Println("[!] No, it's not active!")
 	}
 
 }
@@ -74,4 +82,16 @@ func printHelp() {
 	fmt.Println("  -o, --output\t\toutput file")
 	fmt.Println("  -v, --verbose\t\tprint input flags if set")
 	fmt.Println("  -h, --help\t\tprint this help menu")
+}
+func ping(ip string) bool {
+	var cmd *exec.Cmd
+	switch runtime.GOOS { // Check OS type for command
+	case "windows":
+		cmd = exec.Command("ping", "-n", "1", ip)
+	default:
+		cmd = exec.Command("ping", "-c", "1", ip)
+	}
+
+	err := cmd.Run()
+	return (err == nil)
 }
