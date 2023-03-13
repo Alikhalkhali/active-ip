@@ -3,9 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
+
+	"github.com/miekg/dns"
 )
 
 func main() {
@@ -62,10 +66,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if ping(ip) {
-		fmt.Println("[!] Yes, it's active !")
+	hasRecord, ptr, err := hasPTRRecord(ip)
+	if err != nil {
+		fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
+
+	}
+	if hasRecord {
+		fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
 	} else {
-		fmt.Println("[!] No, it's not active!")
+		if ping(ip) {
+			fmt.Println("[!] Yes, it's active!")
+		} else {
+			fmt.Println("[-] No, it's not active")
+		}
 	}
 
 }
@@ -94,4 +107,33 @@ func ping(ip string) bool {
 
 	err := cmd.Run()
 	return (err == nil)
+}
+
+func hasPTRRecord(ip string) (bool, string, error) {
+	// Convert IP address to reverse lookup format
+	reverseIP, err := dns.ReverseAddr(ip)
+	if err != nil {
+		return false, "", fmt.Errorf("error converting IP address to reverse lookup format: %v", err)
+	}
+
+	// Set up the DNS client
+	client := new(dns.Client)
+	message := new(dns.Msg)
+	message.SetQuestion(reverseIP, dns.TypePTR)
+
+	// Send the DNS message to DNS server
+	response, _, err := client.Exchange(message, net.JoinHostPort("8.8.8.8", "53"))
+	if err != nil {
+		return false, "", fmt.Errorf("error sending DNS query: %v", err)
+	}
+	if response == nil || response.Rcode != dns.RcodeSuccess || len(response.Answer) == 0 {
+		return false, "", nil
+	}
+
+	// Extract the pointer names from the response
+	ptrNames := make([]string, 0)
+	for _, ans := range response.Answer {
+		ptrNames = append(ptrNames, strings.TrimRight(ans.(*dns.PTR).Ptr, "."))
+	}
+	return true, strings.Join(ptrNames, ", "), nil
 }
