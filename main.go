@@ -79,26 +79,66 @@ func main() {
 		fmt.Println("[!] Use -h or --help for more information")
 		os.Exit(1)
 	}
-	hasRecord, ptr, err := hasPTRRecord(ip)
-	if err != nil {
-		fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
 
-	}
-	if hasRecord {
-		fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
-	} else {
-		if ok := ping(ip, pingTimeout); ok {
-			fmt.Println("[!] Yes, it's active!")
+	// Mode detection
+	if pingMode && ptrMode && portscanMode {
+		fmt.Println("[!] It's also full mode!!!!")
+		hasRecord, ptr, err := hasPTRRecord(ip)
+		if err != nil {
+			fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
+
+		}
+		if hasRecord {
+			fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
 		} else {
-			ok, openPorts := scanPorts(ip, portscanTimeout)
-			if ok {
-				fmt.Println("[!] Yes, IP is active, openport =", openPorts)
+			if ok := ping(ip, pingTimeout); ok {
+				fmt.Println("[!] Yes, it's active!")
 			} else {
-				fmt.Println("[!] No, it's not active!")
+				ok, openPorts := scanPorts(ip, portscanTimeout)
+				if ok {
+					fmt.Println("[!] Yes, IP is active, openport =", openPorts)
+				} else {
+					fmt.Println("[!] No, it's not active!")
+				}
 			}
 		}
-	}
 
+	} else if pingMode && portscanMode {
+		fmt.Println("[!] ping mode and portscan mode!")
+	} else if pingMode && ptrMode {
+		fmt.Println("[!] ping mode and ptr mode!")
+	} else if portscanMode && ptrMode {
+		fmt.Println("[!] portscan mode and ptr mode!")
+	} else if ptrMode {
+		fmt.Println("[!] ptr mode!")
+	} else if pingMode {
+		fmt.Println("[!] ping mode!")
+	} else if portscanMode {
+		fmt.Println("[!] portscan mode!")
+	} else {
+		fmt.Println("[!] full mode!")
+		hasRecord, ptr, err := hasPTRRecord(ip)
+		if err != nil {
+			fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
+
+		}
+		if hasRecord {
+			fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
+		} else {
+			if ok := ping(ip, pingTimeout); ok {
+				fmt.Println("[!] Yes, it's active!")
+			} else {
+				ok, openPorts := scanPorts(ip, portscanTimeout)
+				if ok {
+					fmt.Println("[!] Yes, IP is active, openport =", openPorts)
+				} else {
+					fmt.Println("[!] No, it's not active!")
+				}
+			}
+		}
+
+	}
+	fmt.Println("good bye!")
 }
 
 // Helper function to print the help menu
