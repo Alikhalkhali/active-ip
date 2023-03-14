@@ -23,7 +23,7 @@ func main() {
 		cidr            string
 		cidrList        string
 		outputFile      string
-		verbose         bool
+		isSilent        bool
 		help            bool
 		pingTimeout     time.Duration
 		portscanTimeout time.Duration
@@ -44,8 +44,8 @@ func main() {
 	flag.StringVar(&cidrList, "cidr-list", "", "list of CIDR")
 	flag.StringVar(&outputFile, "o", "", "output file")
 	flag.StringVar(&outputFile, "output", "", "output file")
-	flag.BoolVar(&verbose, "v", false, "print input flags if set")
-	flag.BoolVar(&verbose, "verbose", false, "print input flags if set")
+	flag.BoolVar(&isSilent, "s", false, "silent mode")
+	flag.BoolVar(&isSilent, "silent", false, "silent mode")
 	flag.BoolVar(&help, "h", false, "print this help menu")
 	flag.BoolVar(&help, "help", false, "print this help menu")
 	flag.DurationVar(&pingTimeout, "ping-timeout", 500*time.Millisecond, "Ping timeout in milliseconds")
@@ -57,7 +57,7 @@ func main() {
 	// Parse the input flags and arguments
 	flag.Parse()
 	// If the verbose flag is set, print the input flags
-	if verbose {
+	if isSilent {
 		fmt.Printf("Input flags:\n  -i | --ip\t%s\n  -I | --ip-list\t%s\n  -c | --cidr\t%s\n  -C | --cidr-list\t%s\n  -o | --output\t%s\n  -v | --verbose\t%v\n  -h | --help\t%v\n", ip, ipList, cidr, cidrList, outputFile, verbose, help)
 	}
 
@@ -104,7 +104,8 @@ func main() {
 		}
 
 	} else if pingMode && portscanMode {
-		fmt.Println("[!] ping mode and portscan mode!")
+		fmt.Println()
+		printText(isSilent, "[!] ping mode and portscan mode!", "Info")
 	} else if pingMode && ptrMode {
 		fmt.Println("[!] ping mode and ptr mode!")
 	} else if portscanMode && ptrMode {
@@ -275,5 +276,18 @@ func scanPorts(target string, timeout time.Duration) (bool, []int) {
 		return true, openPorts
 	} else {
 		return false, []int{}
+	}
+}
+func printText(isSilent bool, text string, textType string) {
+	if !isSilent {
+		if textType == "Info" {
+			fmt.Println("[!]", text)
+		} else if textType == "Print" {
+			fmt.Println(text)
+		} else if textType == "Ok" {
+			fmt.Println("[+]", text)
+		} else if textType == "Error" {
+			fmt.Println("[-]", text)
+		}
 	}
 }
