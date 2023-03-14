@@ -7,7 +7,10 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -77,7 +80,12 @@ func main() {
 		if ping(ip) {
 			fmt.Println("[!] Yes, it's active!")
 		} else {
-			fmt.Println("[-] No, it's not active")
+			ok, openPorts := scanPorts(ip)
+			if ok {
+				fmt.Println("[!] Yes, IP is active, openport =", openPorts)
+			} else {
+				fmt.Println("[!] No, it's not active!")
+			}
 		}
 	}
 
@@ -136,4 +144,37 @@ func hasPTRRecord(ip string) (bool, string, error) {
 		ptrNames = append(ptrNames, strings.TrimRight(ans.(*dns.PTR).Ptr, "."))
 	}
 	return true, strings.Join(ptrNames, ", "), nil
+}
+
+func scanPorts(target string) (bool, []int) {
+	openPorts := []int{}
+	ports := []string{"80", "443", "22"}
+
+	var wg sync.WaitGroup // Create a WaitGroup to wait for all goroutines
+	for _, port := range ports {
+
+		wg.Add(1) // Increment WaitGroup counter for new goroutine
+
+		go func(target string, port string) {
+			defer wg.Done() // Notify WaitGroup when goroutine is done
+
+			address := fmt.Sprintf("%s:%s", target, port)
+
+			conn, err := net.DialTimeout("tcp", address, 200*time.Millisecond)
+
+			if err == nil {
+				conn.Close()
+				portNum, _ := strconv.Atoi(port) // convert port string to int
+				openPorts = append(openPorts, portNum)
+			}
+		}(target, port)
+	}
+
+	wg.Wait() // Wait for all goroutines to finish
+
+	if len(openPorts) > 0 {
+		return true, openPorts
+	} else {
+		return false, []int{}
+	}
 }
