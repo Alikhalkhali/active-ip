@@ -18,13 +18,19 @@ import (
 func main() {
 	// Declare variables for storing the input flags and arguments
 	var (
-		ip         string
-		ipList     string
-		cidr       string
-		cidrList   string
-		outputFile string
-		verbose    bool
-		help       bool
+		ip              string
+		ipList          string
+		cidr            string
+		cidrList        string
+		outputFile      string
+		verbose         bool
+		help            bool
+		pingTimeout     time.Duration
+		portscanTimeout time.Duration
+		fullMode        bool
+		pingMode        bool
+		portscanMode    bool
+		ptrMode         bool
 	)
 
 	// Define input flags using the Go "flag" package
@@ -42,7 +48,12 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "print input flags if set")
 	flag.BoolVar(&help, "h", false, "print this help menu")
 	flag.BoolVar(&help, "help", false, "print this help menu")
-
+	flag.DurationVar(&pingTimeout, "ping-timeout", 500*time.Millisecond, "Ping timeout in milliseconds")
+	flag.DurationVar(&portscanTimeout, "portscan-timeout", 200*time.Millisecond, "Port-scan timeout in milliseconds")
+	flag.BoolVar(&fullMode, "full", true, "Runs full mode")
+	flag.BoolVar(&pingMode, "ping", false, "Runs only ping mode")
+	flag.BoolVar(&portscanMode, "portscan", false, "Runs only portscan mode")
+	flag.BoolVar(&ptrMode, "ptr", false, "Runs PTR scan")
 	// Parse the input flags and arguments
 	flag.Parse()
 	// If the verbose flag is set, print the input flags
@@ -68,7 +79,6 @@ func main() {
 		fmt.Println("[!] Use -h or --help for more information")
 		os.Exit(1)
 	}
-	timeout := time.Millisecond * 500
 	hasRecord, ptr, err := hasPTRRecord(ip)
 	if err != nil {
 		fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
@@ -77,10 +87,10 @@ func main() {
 	if hasRecord {
 		fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
 	} else {
-		if ok := ping(ip, timeout); ok {
+		if ok := ping(ip, pingTimeout); ok {
 			fmt.Println("[!] Yes, it's active!")
 		} else {
-			ok, openPorts := scanPorts(ip)
+			ok, openPorts := scanPorts(ip, portscanTimeout)
 			if ok {
 				fmt.Println("[!] Yes, IP is active, openport =", openPorts)
 			} else {
@@ -195,7 +205,7 @@ func hasPTRRecord(ip string) (bool, string, error) {
 	return true, strings.Join(ptrNames, ", "), nil
 }
 
-func scanPorts(target string) (bool, []int) {
+func scanPorts(target string, timeout time.Duration) (bool, []int) {
 	openPorts := []int{}
 	ports := []string{"80", "443", "22"}
 
@@ -209,7 +219,7 @@ func scanPorts(target string) (bool, []int) {
 
 			address := fmt.Sprintf("%s:%s", target, port)
 
-			conn, err := net.DialTimeout("tcp", address, 200*time.Millisecond)
+			conn, err := net.DialTimeout("tcp", address, timeout)
 
 			if err == nil {
 				conn.Close()
