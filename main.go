@@ -58,7 +58,7 @@ func main() {
 	flag.Parse()
 	// If the verbose flag is set, print the input flags
 	if isSilent {
-		fmt.Printf("Input flags:\n  -i | --ip\t%s\n  -I | --ip-list\t%s\n  -c | --cidr\t%s\n  -C | --cidr-list\t%s\n  -o | --output\t%s\n  -v | --verbose\t%v\n  -h | --help\t%v\n", ip, ipList, cidr, cidrList, outputFile, verbose, help)
+		fmt.Printf("Input flags:\n  -i | --ip\t%s\n  -I | --ip-list\t%s\n  -c | --cidr\t%s\n  -C | --cidr-list\t%s\n  -o | --output\t%s\n  -v | --verbose\t%v\n  -h | --help\t%v\n", ip, ipList, cidr, cidrList, outputFile, isSilent, help)
 	}
 
 	// If the help flag is set, print the help menu and exit
@@ -290,4 +290,22 @@ func printText(isSilent bool, text string, textType string) {
 			fmt.Println("[-]", text)
 		}
 	}
+}
+func printOrSaveResult(outputFile string, data string) error {
+	if outputFile == "" {
+		fmt.Println(data)
+		return nil
+	}
+
+	f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := fmt.Fprint(f, data+"\n"); err != nil {
+		return err
+	}
+
+	return nil
 }
