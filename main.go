@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/miekg/dns"
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
 )
 
 func main() {
@@ -68,7 +68,7 @@ func main() {
 		fmt.Println("[!] Use -h or --help for more information")
 		os.Exit(1)
 	}
-
+	timeout := time.Millisecond * 500
 	hasRecord, ptr, err := hasPTRRecord(ip)
 	if err != nil {
 		fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
@@ -77,7 +77,7 @@ func main() {
 	if hasRecord {
 		fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
 	} else {
-		if ping(ip) {
+		if ok := ping(ip, timeout); ok {
 			fmt.Println("[!] Yes, it's active!")
 		} else {
 			ok, openPorts := scanPorts(ip)
@@ -104,17 +104,66 @@ func printHelp() {
 	fmt.Println("  -v, --verbose\t\tprint input flags if set")
 	fmt.Println("  -h, --help\t\tprint this help menu")
 }
-func ping(ip string) bool {
-	var cmd *exec.Cmd
-	switch runtime.GOOS { // Check OS type for command
-	case "windows":
-		cmd = exec.Command("ping", "-n", "1", ip)
-	default:
-		cmd = exec.Command("ping", "-c", "1", ip)
+
+// Ping sends an ICMP echo request to the specified IP address and returns true
+// if a response is received within the timeout period, otherwise false.
+func ping(ip string, timeout time.Duration) bool {
+	conn, err := net.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+
+	// Resolve IP address
+	dstAddr, err := net.ResolveIPAddr("ip4", ip)
+	if err != nil {
+		return false
 	}
 
-	err := cmd.Run()
-	return (err == nil)
+	// Construct ICMP echo request message
+	echo := icmp.Message{
+		Type: ipv4.ICMPTypeEcho,
+		Code: 0,
+		Body: &icmp.Echo{
+			ID:   os.Getpid() & 0xffff,
+			Seq:  1,
+			Data: []byte(""),
+		},
+	}
+
+	echoBytes, err := echo.Marshal(nil)
+	if err != nil {
+		return false
+	}
+
+	// Send ICMP echo request
+	if _, err := conn.WriteTo(echoBytes, dstAddr); err != nil {
+		return false
+	}
+
+	// Await for ICMP echo reply
+	replyBytes := make([]byte, 1500)
+	err = conn.SetReadDeadline(time.Now().Add(timeout))
+	if err != nil {
+		return false
+	}
+	n, _, err := conn.ReadFrom(replyBytes)
+	if err != nil {
+		return false
+	}
+
+	// Parse ICMP echo reply
+	replyMsg, err := icmp.ParseMessage(ipv4.ICMPTypeEchoReply.Protocol(), replyBytes[:n])
+	if err != nil {
+		return false
+	}
+
+	// Check for ICMP echo reply
+	if replyMsg.Type != ipv4.ICMPTypeEchoReply {
+		return false
+	}
+
+	return true
 }
 
 func hasPTRRecord(ip string) (bool, string, error) {
