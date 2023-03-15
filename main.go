@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"encoding/binary"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -108,6 +111,79 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	// create temp directory
+	rand.Seed(time.Now().UnixNano())
+	randNum := rand.Int63n(8999999999)
+	randNum += 1000000000
+	tempDir := fmt.Sprintf("%s/active-ip-%d", os.TempDir(), randNum)
+	if err := os.MkdirAll(tempDir, 0777); err != nil {
+		printText(isSilent, "unable to create temp directory", "Error")
+	}
+	// temp IP list
+	tempIPList := fmt.Sprintf("%s/temp-ip-list.txt", tempDir)
+	fmt.Println(tempIPList)
+
+	// convert cidr or cidr list to ip list
+	if cidr != "" {
+		ok, hosts := cidrHosts(cidr)
+		if !ok {
+			fmt.Println("invalid cidr address")
+			os.Exit(1)
+		}
+		output := strings.Join(hosts, "\n") + "\n"
+		f, err := os.OpenFile(tempIPList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Println("Error opening file:", err)
+			return
+		}
+		defer f.Close()
+		_, err = f.WriteString(output)
+		if err != nil {
+			fmt.Println("Error writing to file:", err)
+			return
+		}
+	}
+	if cidrList != "" {
+		file, err := os.Open(cidrList)
+		if err != nil {
+			fmt.Println("Error opening file:", err)
+			return
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		semaphore := make(chan struct{}, 10) // max number of goroutines
+		var wg sync.WaitGroup
+		for scanner.Scan() {
+			wg.Add(1)
+			cidr := scanner.Text()
+			semaphore <- struct{}{} // acquire semaphore
+			go func(cidr string) {
+				defer func() { <-semaphore; wg.Done() }() // release semaphore and mark as done
+				ok, hosts := cidrHosts(cidr)
+				if !ok {
+					fmt.Println("there is invalid CIDR address in cidr-list")
+					os.Exit(1)
+				}
+				output := strings.Join(hosts, "\n") + "\n"
+				f, err := os.OpenFile(tempIPList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				if err != nil {
+					fmt.Println("Error opening file:", err)
+					return
+				}
+				defer f.Close()
+				_, err = f.WriteString(output)
+				if err != nil {
+					fmt.Println("Error writing to file:", err)
+					return
+				}
+			}(cidr)
+		}
+		wg.Wait()
+		if err := scanner.Err(); err != nil {
+			fmt.Println("Error scanning file:", err)
+		}
+	}
+
 	// for test
 	data := []string{"this is first line", "127.0.0.1", "this is sadflkajsdfkljds", "192.168.1.1", "asldjflkasjdfl alksdfj", "alsdkjflkadsjf", "this is end of the line and program good luck!"}
 	for _, d := range data {
@@ -343,4 +419,31 @@ func printOrSaveActiveIP(outputFile string, data string) error {
 	}
 
 	return nil
+}
+
+func cidrHosts(netw string) (bool, []string) {
+	// convert string to IPNet struct
+	_, ipv4Net, err := net.ParseCIDR(netw)
+	if err != nil {
+		return false, []string{}
+	}
+	// convert IPNet struct mask and address to uint32
+	mask := binary.BigEndian.Uint32(ipv4Net.Mask)
+	// find the start IP address
+	start := binary.BigEndian.Uint32(ipv4Net.IP)
+	// find the final IP address
+	finish := (start & mask) | (mask ^ 0xffffffff)
+	// make a slice to return host addresses
+	var hosts []string
+	// loop through addresses as uint32.
+	// I used "start + 1" and "finish - 1" to discard the network and broadcast addresses.
+	for i := start + 1; i <= finish-1; i++ {
+		// convert back to net.IPs
+		// Create IP address of type net.IP. IPv4 is 4 bytes, IPv6 is 16 bytes.
+		ip := make(net.IP, 4)
+		binary.BigEndian.PutUint32(ip, i)
+		hosts = append(hosts, ip.String())
+	}
+	// return a slice of strings containing IP addresses
+	return true, hosts
 }
