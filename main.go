@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +24,7 @@ func main() {
 		cidr            string
 		cidrList        string
 		outputFile      string
+		verbose         bool
 		isSilent        bool
 		help            bool
 		pingTimeout     time.Duration
@@ -44,6 +46,8 @@ func main() {
 	flag.StringVar(&cidrList, "cidr-list", "", "list of CIDR")
 	flag.StringVar(&outputFile, "o", "", "output file")
 	flag.StringVar(&outputFile, "output", "", "output file")
+	flag.BoolVar(&verbose, "v", false, "verbose mode. If it is set, it shows according to which technique the IP is active.")
+	flag.BoolVar(&verbose, "verbose", false, "verbose mode. If it is set, it shows according to which technique the IP is active.")
 	flag.BoolVar(&isSilent, "s", false, "silent mode")
 	flag.BoolVar(&isSilent, "silent", false, "silent mode")
 	flag.BoolVar(&help, "h", false, "print this help menu")
@@ -57,10 +61,9 @@ func main() {
 	// Parse the input flags and arguments
 	flag.Parse()
 	// If the verbose flag is set, print the input flags
-	if isSilent {
+	if verbose {
 		fmt.Printf("Input flags:\n  -i | --ip\t%s\n  -I | --ip-list\t%s\n  -c | --cidr\t%s\n  -C | --cidr-list\t%s\n  -o | --output\t%s\n  -v | --verbose\t%v\n  -h | --help\t%v\n", ip, ipList, cidr, cidrList, outputFile, isSilent, help)
 	}
-
 	// If the help flag is set, print the help menu and exit
 	if help {
 		printHelp()
@@ -78,6 +81,38 @@ func main() {
 		fmt.Println("[-] You can use one of the (-c | --cidr), (-i | --ip), (-I | --ip-list), (-C | --cidr-list) flags!")
 		fmt.Println("[!] Use -h or --help for more information")
 		os.Exit(1)
+	}
+
+	if outputFile == "" {
+		printText(isSilent, "The result will be displayed in stdout.", "Info")
+
+	} else {
+		outputDir := filepath.Dir(outputFile)
+
+		if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+			printText(isSilent, "specified output directory does not exist.", "Error")
+			os.Exit(1)
+		}
+
+		if _, err := os.Stat(outputFile); err == nil {
+			err := os.Remove(outputFile)
+			if err != nil {
+				printText(isSilent, "unable to remove the output file.", "Error")
+				os.Exit(1)
+			}
+		}
+
+		_, err := os.Create(outputFile)
+		if err != nil {
+			printText(isSilent, "unable to create output file", "Error")
+			os.Exit(1)
+		}
+	}
+	// for test
+	data := []string{"this is first line", "127.0.0.1", "this is sadflkajsdfkljds", "192.168.1.1", "asldjflkasjdfl alksdfj", "alsdkjflkadsjf", "this is end of the line and program good luck!"}
+	for _, d := range data {
+		printOrSaveActiveIP(outputFile, d)
+
 	}
 
 	// Mode detection
@@ -291,7 +326,7 @@ func printText(isSilent bool, text string, textType string) {
 		}
 	}
 }
-func printOrSaveResult(outputFile string, data string) error {
+func printOrSaveActiveIP(outputFile string, data string) error {
 	if outputFile == "" {
 		fmt.Println(data)
 		return nil
