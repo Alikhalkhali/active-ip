@@ -27,6 +27,7 @@ func main() {
 		cidr            string
 		cidrList        string
 		outputFile      string
+		threads         int
 		verbose         bool
 		isSilent        bool
 		help            bool
@@ -61,12 +62,10 @@ func main() {
 	flag.BoolVar(&pingMode, "ping", false, "Runs only ping mode")
 	flag.BoolVar(&portscanMode, "portscan", false, "Runs only portscan mode")
 	flag.BoolVar(&ptrMode, "ptr", false, "Runs PTR scan")
+	flag.IntVar(&threads, "t", 5, "number of threads")
+	flag.IntVar(&threads, "threads", 5, "number of threads")
 	// Parse the input flags and arguments
 	flag.Parse()
-	// If the verbose flag is set, print the input flags
-	if verbose {
-		fmt.Printf("Input flags:\n  -i | --ip\t%s\n  -I | --ip-list\t%s\n  -c | --cidr\t%s\n  -C | --cidr-list\t%s\n  -o | --output\t%s\n  -v | --verbose\t%v\n  -h | --help\t%v\n", ip, ipList, cidr, cidrList, outputFile, isSilent, help)
-	}
 	// If the help flag is set, print the help menu and exit
 	if help {
 		printHelp()
@@ -111,17 +110,19 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	// create temp directory
-	rand.Seed(time.Now().UnixNano())
-	randNum := rand.Int63n(8999999999)
-	randNum += 1000000000
-	tempDir := fmt.Sprintf("%s/active-ip-%d", os.TempDir(), randNum)
-	if err := os.MkdirAll(tempDir, 0777); err != nil {
-		printText(isSilent, "unable to create temp directory", "Error")
+	if ipList == "" {
+		// create temp directory
+		rand.Seed(time.Now().UnixNano())
+		randNum := rand.Int63n(8999999999)
+		randNum += 1000000000
+		tempDir := fmt.Sprintf("%s/active-ip-%d", os.TempDir(), randNum)
+		if err := os.MkdirAll(tempDir, 0777); err != nil {
+			printText(isSilent, "unable to create temp directory", "Error")
+		}
+		// temp IP list
+		ipList = fmt.Sprintf("%s/temp-ip-list.txt", tempDir)
+
 	}
-	// temp IP list
-	tempIPList := fmt.Sprintf("%s/temp-ip-list.txt", tempDir)
-	fmt.Println(tempIPList)
 
 	// convert cidr or cidr list to ip list
 	if cidr != "" {
@@ -131,7 +132,7 @@ func main() {
 			os.Exit(1)
 		}
 		output := strings.Join(hosts, "\n") + "\n"
-		f, err := os.OpenFile(tempIPList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(ipList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			fmt.Println("Error opening file:", err)
 			return
@@ -165,7 +166,7 @@ func main() {
 					os.Exit(1)
 				}
 				output := strings.Join(hosts, "\n") + "\n"
-				f, err := os.OpenFile(tempIPList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				f, err := os.OpenFile(ipList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 				if err != nil {
 					fmt.Println("Error opening file:", err)
 					return
@@ -186,24 +187,327 @@ func main() {
 
 	// Mode detection
 	if pingMode && ptrMode && portscanMode {
-		fmt.Println("[!] It's also full mode!!!!")
-		fullModeTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose)
-	} else if pingMode && portscanMode {
-		fmt.Println()
-		printText(isSilent, "[!] ping mode and portscan mode!", "Info")
-	} else if pingMode && ptrMode {
-		fmt.Println("[!] ping mode and ptr mode!")
-	} else if portscanMode && ptrMode {
-		fmt.Println("[!] portscan mode and ptr mode!")
-	} else if ptrMode {
-		fmt.Println("[!] ptr mode!")
-	} else if pingMode {
-		fmt.Println("[!] ping mode!")
-	} else if portscanMode {
-		fmt.Println("[!] portscan mode!")
-	} else {
-		fullModeTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose)
+		if ip != "" {
+			fullTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent)
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
 
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to fullTechnique()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using fullTechnique() function
+			for line := range bufferCh {
+				fullTechnique(line, outputFile, pingTimeout, portscanTimeout, verbose, isSilent)
+
+			}
+		}
+	} else if pingMode && portscanMode {
+		if ip != "" {
+			pingAndPortscanTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent)
+
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
+
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to pingAndPortscanTechnique()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using pingAndPortscanTechnique() function
+			for line := range bufferCh {
+				pingAndPortscanTechnique(line, outputFile, pingTimeout, portscanTimeout, verbose, isSilent)
+
+			}
+		}
+	} else if pingMode && ptrMode {
+		if ip != "" {
+			ptrRecordAndPingTechnique(ip, outputFile, pingTimeout, verbose, isSilent)
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
+
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to ptrRecordAndPingTechnique()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using ptrRecordAndPingTechnique() function
+			for line := range bufferCh {
+				ptrRecordAndPingTechnique(line, outputFile, pingTimeout, verbose, isSilent)
+
+			}
+		}
+	} else if portscanMode && ptrMode {
+		if ip != "" {
+			ptrRecordAndPortscanTechnique(ip, outputFile, portscanTimeout, verbose, isSilent)
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
+
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to ptrRecordAndPortscanTechnique()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using ptrRecordAndPortscanTechnique() function
+			for line := range bufferCh {
+				ptrRecordAndPortscanTechnique(line, outputFile, portscanTimeout, verbose, isSilent)
+
+			}
+		}
+	} else if ptrMode {
+		if ip != "" {
+			if !hasPTRRecord(ip, outputFile, verbose, isSilent) {
+				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
+			}
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
+
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to hasPTRRecord()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using hasPTRRecord function
+			for line := range bufferCh {
+				if !hasPTRRecord(line, outputFile, verbose, isSilent) {
+					printText(isSilent, fmt.Sprintf("%s isn't active", line), "Info")
+				}
+			}
+		}
+	} else if pingMode {
+		if ip != "" {
+			if !ping(ip, outputFile, pingTimeout, verbose) {
+				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
+			}
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
+
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to ping()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using ping() function
+			for line := range bufferCh {
+				if !ping(line, outputFile, pingTimeout, verbose) {
+					printText(isSilent, fmt.Sprintf("%s isn't active", line), "Info")
+				}
+			}
+		}
+	} else if portscanMode {
+		if ip != "" {
+			if !scanPorts(ip, outputFile, portscanTimeout, verbose) {
+				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
+			}
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
+
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to scanPorts()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using scanPorts() function
+			for line := range bufferCh {
+				if !scanPorts(line, outputFile, portscanTimeout, verbose) {
+					printText(isSilent, fmt.Sprintf("%s isn't active", line), "Info")
+				}
+			}
+		}
+	} else {
+		if ip != "" {
+			fullTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent)
+		} else {
+			// Open the file
+			file, _ := os.Open(ipList)
+			defer file.Close()
+
+			// Create a scanner
+			scanner := bufio.NewScanner(file)
+			bufferCh := make(chan string)
+
+			// Initialize a wait group to ensure all goroutines complete before exiting
+			var wg sync.WaitGroup
+			wg.Add(threads)
+
+			// Read lines concurrently; each goroutine will pass the line to fullTechnique()
+			for i := 0; i < threads; i++ {
+				go func() {
+					defer wg.Done()
+
+					for scanner.Scan() {
+						bufferCh <- scanner.Text()
+					}
+				}()
+			}
+
+			// Wait for all goroutines to complete
+			go func() {
+				wg.Wait()
+				close(bufferCh)
+			}()
+
+			// Process the buffered lines using fullTechnique() function
+			for line := range bufferCh {
+				fullTechnique(line, outputFile, pingTimeout, portscanTimeout, verbose, isSilent)
+
+			}
+		}
 	}
 	fmt.Println("good bye!")
 }
@@ -224,7 +528,7 @@ func printHelp() {
 
 // Ping sends an ICMP echo request to the specified IP address and returns true
 // if a response is received within the timeout period, otherwise false.
-func ping(ip string, timeout time.Duration) bool {
+func ping(ip string, outputFile string, timeout time.Duration, verbose bool) bool {
 	conn, err := net.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		return false
@@ -279,17 +583,17 @@ func ping(ip string, timeout time.Duration) bool {
 	if replyMsg.Type != ipv4.ICMPTypeEchoReply {
 		return false
 	}
-
+	printOrSaveActiveIP(outputFile, ip, "was pinged", verbose)
 	return true
 }
 
-func hasPTRRecord(ip string) (bool, string, error) {
+func hasPTRRecord(ip string, outputFile string, verbose bool, isSilent bool) bool {
 	// Convert IP address to reverse lookup format
 	reverseIP, err := dns.ReverseAddr(ip)
 	if err != nil {
-		return false, "", fmt.Errorf("error converting IP address to reverse lookup format: %v", err)
+		printText(isSilent, fmt.Sprintf("error converting IP address to reverse lookup format: %v", err), "Error")
+		os.Exit(1)
 	}
-
 	// Set up the DNS client
 	client := new(dns.Client)
 	message := new(dns.Msg)
@@ -298,10 +602,11 @@ func hasPTRRecord(ip string) (bool, string, error) {
 	// Send the DNS message to DNS server
 	response, _, err := client.Exchange(message, net.JoinHostPort("8.8.8.8", "53"))
 	if err != nil {
-		return false, "", fmt.Errorf("error sending DNS query: %v", err)
+		printText(isSilent, fmt.Sprintf("error sending DNS query: %v", err), "Error")
+		os.Exit(1)
 	}
 	if response == nil || response.Rcode != dns.RcodeSuccess || len(response.Answer) == 0 {
-		return false, "", nil
+		return false
 	}
 
 	// Extract the pointer names from the response
@@ -309,10 +614,12 @@ func hasPTRRecord(ip string) (bool, string, error) {
 	for _, ans := range response.Answer {
 		ptrNames = append(ptrNames, strings.TrimRight(ans.(*dns.PTR).Ptr, "."))
 	}
-	return true, strings.Join(ptrNames, ", "), nil
+	printOrSaveActiveIP(outputFile, ip, fmt.Sprintf("has PTR record [%s]", strings.Join(ptrNames, ", ")), verbose)
+
+	return true
 }
 
-func scanPorts(target string, timeout time.Duration) (bool, []int) {
+func scanPorts(target string, outputFile string, timeout time.Duration, verbose bool) bool {
 	openPorts := []int{}
 	ports := []string{"80", "443", "22"}
 
@@ -339,9 +646,11 @@ func scanPorts(target string, timeout time.Duration) (bool, []int) {
 	wg.Wait() // Wait for all goroutines to finish
 
 	if len(openPorts) > 0 {
-		return true, openPorts
+		printOrSaveActiveIP(outputFile, target, fmt.Sprintf("has open port %v", openPorts), verbose)
+
+		return true
 	} else {
-		return false, []int{}
+		return false
 	}
 }
 func printText(isSilent bool, text string, textType string) {
@@ -407,14 +716,33 @@ func cidrHosts(netw string) (bool, []string) {
 	// return a slice of strings containing IP addresses
 	return true, hosts
 }
-func fullModeTechnique(ip string, outputFile string, pingTimeout time.Duration, portscanTimeout time.Duration, verbose bool) {
-	hasRecord, ptr, _ := hasPTRRecord(ip)
-	if hasRecord {
-		printOrSaveActiveIP(outputFile, ip, fmt.Sprintf("has PTR record [%s]", ptr), verbose)
-	} else if ok := ping(ip, pingTimeout); ok {
-		printOrSaveActiveIP(outputFile, ip, "was pinged", verbose)
-	} else if ok, openPorts := scanPorts(ip, portscanTimeout); ok {
-
-		printOrSaveActiveIP(outputFile, ip, fmt.Sprintf("has open port %s", openPorts), verbose)
+func fullTechnique(ip string, outputFile string, pingTimeout time.Duration, portscanTimeout time.Duration, verbose bool, isSilent bool) {
+	if !hasPTRRecord(ip, outputFile, verbose, isSilent) {
+		if !ping(ip, outputFile, pingTimeout, verbose) {
+			if !scanPorts(ip, outputFile, portscanTimeout, verbose) {
+				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
+			}
+		}
+	}
+}
+func pingAndPortscanTechnique(ip string, outputFile string, pingTimeout time.Duration, portscanTimeout time.Duration, verbose bool, isSilent bool) {
+	if !ping(ip, outputFile, pingTimeout, verbose) {
+		if !scanPorts(ip, outputFile, portscanTimeout, verbose) {
+			printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
+		}
+	}
+}
+func ptrRecordAndPingTechnique(ip string, outputFile string, pingTimeout time.Duration, verbose bool, isSilent bool) {
+	if !hasPTRRecord(ip, outputFile, verbose, isSilent) {
+		if !ping(ip, outputFile, pingTimeout, verbose) {
+			printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
+		}
+	}
+}
+func ptrRecordAndPortscanTechnique(ip string, outputFile string, portscanTimeout time.Duration, verbose bool, isSilent bool) {
+	if !hasPTRRecord(ip, outputFile, verbose, isSilent) {
+		if !scanPorts(ip, outputFile, portscanTimeout, verbose) {
+			printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
+		}
 	}
 }
