@@ -360,7 +360,7 @@ func printText(isSilent bool, text string, textType string) {
 func printOrSaveActiveIP(outputFile string, data string, technique string, verbose bool) error {
 	if outputFile == "" {
 		if verbose {
-			fmt.Println(fmt.Sprintf("%s\t%s", data, technique))
+			fmt.Printf("%s\t%s\n", data, technique)
 		} else {
 			fmt.Println(data)
 		}
@@ -373,7 +373,7 @@ func printOrSaveActiveIP(outputFile string, data string, technique string, verbo
 	}
 	defer f.Close()
 	if verbose {
-		fmt.Fprint(f, fmt.Sprintf("%s\t%s\n", data, technique))
+		fmt.Fprintf(f, "%s\t%s\n", data, technique)
 	} else {
 		fmt.Fprint(f, data+"\n")
 	}
