@@ -184,36 +184,10 @@ func main() {
 		}
 	}
 
-	// for test
-	data := []string{"this is first line", "127.0.0.1", "this is sadflkajsdfkljds", "192.168.1.1", "asldjflkasjdfl alksdfj", "alsdkjflkadsjf", "this is end of the line and program good luck!"}
-	for _, d := range data {
-		printOrSaveActiveIP(outputFile, d)
-
-	}
-
 	// Mode detection
 	if pingMode && ptrMode && portscanMode {
 		fmt.Println("[!] It's also full mode!!!!")
-		hasRecord, ptr, err := hasPTRRecord(ip)
-		if err != nil {
-			fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
-
-		}
-		if hasRecord {
-			fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
-		} else {
-			if ok := ping(ip, pingTimeout); ok {
-				fmt.Println("[!] Yes, it's active!")
-			} else {
-				ok, openPorts := scanPorts(ip, portscanTimeout)
-				if ok {
-					fmt.Println("[!] Yes, IP is active, openport =", openPorts)
-				} else {
-					fmt.Println("[!] No, it's not active!")
-				}
-			}
-		}
-
+		fullModeTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose)
 	} else if pingMode && portscanMode {
 		fmt.Println()
 		printText(isSilent, "[!] ping mode and portscan mode!", "Info")
@@ -228,26 +202,7 @@ func main() {
 	} else if portscanMode {
 		fmt.Println("[!] portscan mode!")
 	} else {
-		fmt.Println("[!] full mode!")
-		hasRecord, ptr, err := hasPTRRecord(ip)
-		if err != nil {
-			fmt.Printf("Error checking for PTR record for %s: %v\n", ip, err)
-
-		}
-		if hasRecord {
-			fmt.Printf("IP %s has PTR record: %s\n", ip, ptr)
-		} else {
-			if ok := ping(ip, pingTimeout); ok {
-				fmt.Println("[!] Yes, it's active!")
-			} else {
-				ok, openPorts := scanPorts(ip, portscanTimeout)
-				if ok {
-					fmt.Println("[!] Yes, IP is active, openport =", openPorts)
-				} else {
-					fmt.Println("[!] No, it's not active!")
-				}
-			}
-		}
+		fullModeTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose)
 
 	}
 	fmt.Println("good bye!")
@@ -402,9 +357,13 @@ func printText(isSilent bool, text string, textType string) {
 		}
 	}
 }
-func printOrSaveActiveIP(outputFile string, data string) error {
+func printOrSaveActiveIP(outputFile string, data string, technique string, verbose bool) error {
 	if outputFile == "" {
-		fmt.Println(data)
+		if verbose {
+			fmt.Println(fmt.Sprintf("%s\t%s", data, technique))
+		} else {
+			fmt.Println(data)
+		}
 		return nil
 	}
 
@@ -413,9 +372,10 @@ func printOrSaveActiveIP(outputFile string, data string) error {
 		return err
 	}
 	defer f.Close()
-
-	if _, err := fmt.Fprint(f, data+"\n"); err != nil {
-		return err
+	if verbose {
+		fmt.Fprint(f, fmt.Sprintf("%s\t%s\n", data, technique))
+	} else {
+		fmt.Fprint(f, data+"\n")
 	}
 
 	return nil
@@ -446,4 +406,15 @@ func cidrHosts(netw string) (bool, []string) {
 	}
 	// return a slice of strings containing IP addresses
 	return true, hosts
+}
+func fullModeTechnique(ip string, outputFile string, pingTimeout time.Duration, portscanTimeout time.Duration, verbose bool) {
+	hasRecord, ptr, _ := hasPTRRecord(ip)
+	if hasRecord {
+		printOrSaveActiveIP(outputFile, ip, fmt.Sprintf("has PTR record [%s]", ptr), verbose)
+	} else if ok := ping(ip, pingTimeout); ok {
+		printOrSaveActiveIP(outputFile, ip, "was pinged", verbose)
+	} else if ok, openPorts := scanPorts(ip, portscanTimeout); ok {
+
+		printOrSaveActiveIP(outputFile, ip, fmt.Sprintf("has open port %s", openPorts), verbose)
+	}
 }
