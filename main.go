@@ -73,7 +73,6 @@ func main() {
 	flag.Parse()
 	// Get the values of the ports flags
 	ports = strings.Split(tmpPorts, ",")
-	fmt.Println(ports)
 	// If the help flag is set, print the help menu and exit
 	if help {
 		printHelp()
@@ -82,14 +81,14 @@ func main() {
 
 	// Check if at least one of the required flags is set
 	if cidr == "" && cidrList == "" && ip == "" && ipList == "" {
-		fmt.Println("[-] You must specify at least one of the following flags: (-c | --cidr), (-i | --ip), (-I | --ip-list), (-C | --cidr-list)")
-		fmt.Println("Use -h or --help for more information")
+		printText(isSilent, "You must specify at least one of the following flags: (-c | --cidr), (-i | --ip), (-I | --ip-list), (-C | --cidr-list", "Error")
+		printText(isSilent, "Use -h or --help for more information", "Info")
 		os.Exit(1)
 	}
 
 	if (ip != "" && ipList != "") || (ip != "" && cidr != "") || (ip != "" && cidrList != "") || (ipList != "" && cidr != "") || (ipList != "" && cidrList != "") || (cidr != "" && cidrList != "") {
-		fmt.Println("[-] You can use one of the (-c | --cidr), (-i | --ip), (-I | --ip-list), (-C | --cidr-list) flags!")
-		fmt.Println("[!] Use -h or --help for more information")
+		printText(isSilent, " You can use one of the (-c | --cidr), (-i | --ip), (-I | --ip-list), (-C | --cidr-list) flags!", "Error")
+		printText(isSilent, "Use -h or --help for more information", "Info")
 		os.Exit(1)
 	}
 
@@ -100,23 +99,25 @@ func main() {
 		outputDir := filepath.Dir(outputFile)
 
 		if _, err := os.Stat(outputDir); os.IsNotExist(err) {
-			printText(isSilent, "specified output directory does not exist.", "Error")
+			printText(isSilent, "Specified output directory does not exist.", "Error")
 			os.Exit(1)
 		}
 
 		if _, err := os.Stat(outputFile); err == nil {
 			err := os.Remove(outputFile)
 			if err != nil {
-				printText(isSilent, "unable to remove the output file.", "Error")
+				printText(isSilent, "Unable to remove the output file.", "Error")
 				os.Exit(1)
 			}
 		}
 
 		_, err := os.Create(outputFile)
 		if err != nil {
-			printText(isSilent, "unable to create output file", "Error")
+			printText(isSilent, "Unable to create output file", "Error")
 			os.Exit(1)
 		}
+		printText(isSilent, "The result will be saved in: "+outputFile, "Info")
+
 	}
 	if ipList == "" {
 		// create temp directory
@@ -125,7 +126,7 @@ func main() {
 		randNum += 1000000000
 		tempDir := fmt.Sprintf("%s/active-ip-%d", os.TempDir(), randNum)
 		if err := os.MkdirAll(tempDir, 0777); err != nil {
-			printText(isSilent, "unable to create temp directory", "Error")
+			printText(isSilent, "Unable to create temp directory", "Error")
 		}
 		// temp IP list
 		ipList = fmt.Sprintf("%s/temp-ip-list.txt", tempDir)
@@ -136,26 +137,26 @@ func main() {
 	if cidr != "" {
 		ok, hosts := cidrHosts(cidr)
 		if !ok {
-			fmt.Println("invalid cidr address")
+			printText(isSilent, "invalid cidr address", "Error")
 			os.Exit(1)
 		}
 		output := strings.Join(hosts, "\n") + "\n"
 		f, err := os.OpenFile(ipList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Println("Error opening file:", err)
+			printText(isSilent, fmt.Sprintf("Error opening file: %v", err), "Error")
 			return
 		}
 		defer f.Close()
 		_, err = f.WriteString(output)
 		if err != nil {
-			fmt.Println("Error writing to file:", err)
+			printText(isSilent, fmt.Sprintf("Error writing to file: %v", err), "Error")
 			return
 		}
 	}
 	if cidrList != "" {
 		file, err := os.Open(cidrList)
 		if err != nil {
-			fmt.Println("Error opening file:", err)
+			printText(isSilent, fmt.Sprintf("Error opening file: %v", err), "Error")
 			return
 		}
 		defer file.Close()
@@ -170,31 +171,32 @@ func main() {
 				defer func() { <-semaphore; wg.Done() }() // release semaphore and mark as done
 				ok, hosts := cidrHosts(cidr)
 				if !ok {
-					fmt.Println("there is invalid CIDR address in cidr-list")
+					printText(isSilent, "there is invalid CIDR address in cidr-list", "Error")
 					os.Exit(1)
 				}
 				output := strings.Join(hosts, "\n") + "\n"
 				f, err := os.OpenFile(ipList, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 				if err != nil {
-					fmt.Println("Error opening file:", err)
+					printText(isSilent, fmt.Sprintf("Error opening file: %v", err), "Error")
 					return
 				}
 				defer f.Close()
 				_, err = f.WriteString(output)
 				if err != nil {
-					fmt.Println("Error writing to file:", err)
+					printText(isSilent, fmt.Sprintf("Error writing to file: %v", err), "Error")
 					return
 				}
 			}(cidr)
 		}
 		wg.Wait()
 		if err := scanner.Err(); err != nil {
-			fmt.Println("Error scanning file:", err)
+			printText(isSilent, fmt.Sprintf("Error scanning file: %v", err), "Error")
 		}
 	}
 
 	// Mode detection
 	if pingMode && ptrMode && portscanMode {
+		printText(isSilent, "Full technique ...", "Info")
 		if ip != "" {
 			fullTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent, ports)
 		} else {
@@ -234,6 +236,7 @@ func main() {
 			}
 		}
 	} else if pingMode && portscanMode {
+		printText(isSilent, "Ping and Portscan technique ...", "Info")
 		if ip != "" {
 			pingAndPortscanTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent, ports)
 
@@ -274,6 +277,7 @@ func main() {
 			}
 		}
 	} else if pingMode && ptrMode {
+		printText(isSilent, "Ping and PTR technique ...", "Info")
 		if ip != "" {
 			ptrRecordAndPingTechnique(ip, outputFile, pingTimeout, verbose, isSilent)
 		} else {
@@ -313,6 +317,7 @@ func main() {
 			}
 		}
 	} else if portscanMode && ptrMode {
+		printText(isSilent, "PTR and Portscan technique ...", "Info")
 		if ip != "" {
 			ptrRecordAndPortscanTechnique(ip, outputFile, portscanTimeout, verbose, isSilent, ports)
 		} else {
@@ -352,7 +357,7 @@ func main() {
 			}
 		}
 	} else if ptrMode {
-		fmt.Println("ptr technique ...")
+		printText(isSilent, "PTR technique ...", "Info")
 		if ip != "" {
 			if !hasPTRRecord(ip, outputFile, verbose, isSilent) {
 				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
@@ -395,6 +400,7 @@ func main() {
 			}
 		}
 	} else if pingMode {
+		printText(isSilent, "Ping technique ...", "Info")
 		if ip != "" {
 			if !ping(ip, outputFile, pingTimeout, verbose) {
 				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
@@ -437,7 +443,7 @@ func main() {
 			}
 		}
 	} else if portscanMode {
-		fmt.Println("portscan technique ...")
+		fmt.Println("Portscan technique ...")
 		if ip != "" {
 			if !portScan(ip, outputFile, portscanTimeout, verbose, ports) {
 				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
@@ -480,6 +486,7 @@ func main() {
 			}
 		}
 	} else {
+		printText(isSilent, "Full technique ...", "Info")
 		if ip != "" {
 			fullTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent, ports)
 		} else {
@@ -519,7 +526,7 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("good bye!")
+	printText(isSilent, "End, good bye:)", "Print")
 }
 
 // Helper function to print the help menu
