@@ -73,6 +73,8 @@ func main() {
 	flag.Parse()
 	// Get the values of the ports flags
 	ports = strings.Split(tmpPorts, ",")
+	//show banner
+	showBanner(isSilent)
 	// If the help flag is set, print the help menu and exit
 	if help {
 		printHelp()
@@ -541,6 +543,9 @@ func printHelp() {
 	fmt.Println("  -o, --output\t\toutput file")
 	fmt.Println("  -v, --verbose\t\tprint input flags if set")
 	fmt.Println("  -h, --help\t\tprint this help menu")
+}
+func showBanner(isSilent bool) {
+	printText(isSilent, "            _   _             _       \n  __ _  ___| |_(_)_   _____  (_)_ __  \n / _` |/ __| __| \\ \\ / / _ \\ | | '_ \\ \n| (_| | (__| |_| |\\ V /  __/ | | |_) |\n \\__,_|\\___|\\__|_| \\_/ \\___| |_| .__/ \n                               |_| \n    made by Ali Khakhali\n\n\n", "Print")
 }
 
 // Ping sends an ICMP echo request to the specified IP address and returns true
