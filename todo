@@ -1,0 +1,4 @@
+- The "Used following port for portscan" message shows in all iteration on cidr hosts
+
+- delete tmpfolder 
+- bad cidr check. e.g: 192.168.1.1/24 just check 192.168.1.1
