@@ -535,7 +535,10 @@ func main() {
 			}
 		}
 	}
-
+	printText(isSilent, "End, good bye:)", "Print")
+	if tempDir != "" {
+		os.Remove(tempDir)
+	}
 }
 
 // Helper function to print the help menu
