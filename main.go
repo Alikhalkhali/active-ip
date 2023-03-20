@@ -199,6 +199,7 @@ func main() {
 	// Mode detection
 	if pingMode && ptrMode && portscanMode {
 		printText(isSilent, "Full technique ...", "Info")
+		printText(isSilent, fmt.Sprintf("Used following port for portscan: %v", ports), "Info")
 		if ip != "" {
 			fullTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent, ports)
 		} else {
@@ -239,6 +240,7 @@ func main() {
 		}
 	} else if pingMode && portscanMode {
 		printText(isSilent, "Ping and Portscan technique ...", "Info")
+		printText(isSilent, fmt.Sprintf("Used following port for portscan: %v", ports), "Info")
 		if ip != "" {
 			pingAndPortscanTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent, ports)
 
@@ -320,7 +322,7 @@ func main() {
 		}
 	} else if portscanMode && ptrMode {
 		printText(isSilent, "PTR and Portscan technique ...", "Info")
-
+		printText(isSilent, fmt.Sprintf("Used following port for portscan: %v", ports), "Info")
 		if ip != "" {
 			ptrRecordAndPortscanTechnique(ip, outputFile, portscanTimeout, verbose, isSilent, ports)
 		} else {
@@ -447,8 +449,9 @@ func main() {
 		}
 	} else if portscanMode {
 		printText(isSilent, "Portscan technique ...", "Info")
+		printText(isSilent, fmt.Sprintf("Used following port for portscan: %v", ports), "Info")
 		if ip != "" {
-			if !portScan(ip, outputFile, portscanTimeout, verbose, ports, isSilent) {
+			if !portScan(ip, outputFile, portscanTimeout, verbose, ports) {
 				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
 			}
 		} else {
@@ -483,13 +486,14 @@ func main() {
 
 			// Process the buffered lines using portScan() function
 			for line := range bufferCh {
-				if !portScan(line, outputFile, portscanTimeout, verbose, ports, isSilent) {
+				if !portScan(line, outputFile, portscanTimeout, verbose, ports) {
 					printText(isSilent, fmt.Sprintf("%s isn't active", line), "Info")
 				}
 			}
 		}
 	} else {
 		printText(isSilent, "Full technique ...", "Info")
+		printText(isSilent, fmt.Sprintf("Used following port for portscan: %v", ports), "Info")
 		if ip != "" {
 			fullTechnique(ip, outputFile, pingTimeout, portscanTimeout, verbose, isSilent, ports)
 		} else {
@@ -633,8 +637,7 @@ func hasPTRRecord(ip string, outputFile string, verbose bool, isSilent bool) boo
 	return true
 }
 
-func portScan(target string, outputFile string, timeout time.Duration, verbose bool, ports []string, isSilent bool) bool {
-	printText(isSilent, fmt.Sprintf("Used following port for portscan: %v", ports), "Info")
+func portScan(target string, outputFile string, timeout time.Duration, verbose bool, ports []string) bool {
 	openPorts := []int{}
 	var wg sync.WaitGroup // Create a WaitGroup to wait for all goroutines
 	for _, port := range ports {
@@ -732,7 +735,7 @@ func cidrHosts(netw string) (bool, []string) {
 func fullTechnique(ip string, outputFile string, pingTimeout time.Duration, portscanTimeout time.Duration, verbose bool, isSilent bool, ports []string) {
 	if !hasPTRRecord(ip, outputFile, verbose, isSilent) {
 		if !ping(ip, outputFile, pingTimeout, verbose) {
-			if !portScan(ip, outputFile, portscanTimeout, verbose, ports, isSilent) {
+			if !portScan(ip, outputFile, portscanTimeout, verbose, ports) {
 				printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
 			}
 		}
@@ -740,7 +743,7 @@ func fullTechnique(ip string, outputFile string, pingTimeout time.Duration, port
 }
 func pingAndPortscanTechnique(ip string, outputFile string, pingTimeout time.Duration, portscanTimeout time.Duration, verbose bool, isSilent bool, ports []string) {
 	if !ping(ip, outputFile, pingTimeout, verbose) {
-		if !portScan(ip, outputFile, portscanTimeout, verbose, ports, isSilent) {
+		if !portScan(ip, outputFile, portscanTimeout, verbose, ports) {
 			printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
 		}
 	}
@@ -754,7 +757,7 @@ func ptrRecordAndPingTechnique(ip string, outputFile string, pingTimeout time.Du
 }
 func ptrRecordAndPortscanTechnique(ip string, outputFile string, portscanTimeout time.Duration, verbose bool, isSilent bool, ports []string) {
 	if !hasPTRRecord(ip, outputFile, verbose, isSilent) {
-		if !portScan(ip, outputFile, portscanTimeout, verbose, ports, isSilent) {
+		if !portScan(ip, outputFile, portscanTimeout, verbose, ports) {
 			printText(isSilent, fmt.Sprintf("%s isn't active", ip), "Info")
 		}
 	}
