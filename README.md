@@ -13,7 +13,7 @@
 
 # Active-IP
 
-Active-IP is a command-line tool written in Go for scanning IP addresses, CIDR notations, and ports. It supports multiple scanning techniques and output options for flexibility and customization.
+Active-IP is a command-line tool written in Go for scanning IP addresses, CIDR notations that extracts live IP addresses from a list of IP addresses or CIDR notations. It supports multiple scanning techniques and output options for flexibility and customization.
 
 ## Installation
 
