@@ -20,7 +20,7 @@ Active-IP is a command-line tool written in Go for scanning IP addresses, CIDR n
 To install Active-IP, you will need to have Go installed on your system. Then, run the following command:
 
 ```bash
-go install github.com/Alikhalkhali/active-ip
+go install github.com/Alikhalkhali/active-ip@latest
 ```
 
 This will download and install the tool and its dependencies.
