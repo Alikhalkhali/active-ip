@@ -97,7 +97,9 @@ Active-IP supports PTR scanning to perform reverse DNS lookups:
 active-ip --ptr
 ```
 
-- **Note:** You can also combine different scanning techniques to get more comprehensive results. For example, you can combine ping scanning with port scanning to find active IP addresses with open ports:
+### Combine different scanning techniques
+
+You can also combine different scanning techniques to get more comprehensive results. For example, you can combine ping scanning with port scanning to find active IP addresses with open ports:
 
 ```
 active-ip --ping --portscan
