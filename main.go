@@ -67,13 +67,14 @@ func main() {
 	flag.BoolVar(&ptrMode, "ptr", false, "Runs PTR scan")
 	flag.StringVar(&tmpPorts, "p", "80,443,22", "Comma-separated list of ports. default: 80,443,22")
 	flag.StringVar(&tmpPorts, "port", "80,443,22", "Comma-separated list of ports. default: 80,443,22")
+	flag.IntVar(&threads, "t", 5, "number of threads")
+	flag.IntVar(&threads, "threads", 5, "number of threads")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Use -h or --help for more information.")
 	}
 	// Parse the input flags and arguments
 	flag.Parse()
 	// Get the values of the ports flags
-	threads = 5
 	ports = strings.Split(tmpPorts, ",")
 	//show banner
 	showBanner(isSilent)
@@ -543,10 +544,10 @@ func main() {
 
 // Helper function to print the help menu
 func printHelp() {
-	fmt.Printf("Usage of the program: \n \nIP Address Options: \n \n    -i or --ip : Specify a single IP address to scan. \n \n    -I or --ip-list : Specify a list of IPs to scan. \n \n    -c or --cidr : Specify a single CIDR notation to scan (e.g. 192.168.0.0/24). \n \n    -C or --cidr-list : Specify a list of CIDR notations to scan. \n \nOutput Options: \n \n    -o or --output : Write output to a file instead of the terminal. \n \n    -v or --verbose : Enable verbose output to show the results of each technique used for scanning. \n \n    -s or --silent : Run the program silently and do not display any output. \n \n    -h or --help : Display this help menu. \n \nScanning Options: \n \n    -p or --port : Specify a comma-separated list of ports to scan. Default ports are 80,443,22. \n \n    --ping-timeout : Set the timeout for ping scans in milliseconds. Default is 400ms. \n \n    --portscan-timeout : Set the timeout for port scans in milliseconds. Default is 400ms. \n \n    --full : Run complete mode, scanning for active IPs and open ports using all techniques. \n \n    --ping : Run only ping mode, scanning for active IPs. \n \n    --portscan : Run only portscan mode, scanning for open ports. \n \n    --ptr : Run PTR scan (reverse DNS lookup). \n \nNote: At least one IP option or CIDR option must be specified. Both options can be used simultaneously. The program will use default values for any unspecified options. \n \nExample usage: \n \n$ active-ip -i 192.168.0.1 -p 80,443 -v \n \nThis will scan the IP address 192.168.0.1 for open ports 80 and 443, and display verbose output.\n")
+	fmt.Printf("Usage of the program: \n \nIP Address Options: \n \n    -i or --ip : Specify a single IP address to scan. \n \n    -I or --ip-list : Specify a list of IPs to scan. \n \n    -c or --cidr : Specify a single CIDR notation to scan (e.g. 192.168.0.0/24). \n \n    -C or --cidr-list : Specify a list of CIDR notations to scan. \n \nOutput Options: \n \n    -o or --output : Write output to a file instead of the terminal. \n \n    -v or --verbose : Enable verbose output to show the results of each technique used for scanning. \n \n    -s or --silent : Run the program silently and do not display any output. \n \n    -h or --help : Display this help menu. \n \nScanning Options:\n \n    -t or --threads : Specify number of threads to be used for scanning. Default is 5.\n\n    -p or --port : Specify a comma-separated list of ports to scan. Default ports are 80,443,22. \n \n    --ping-timeout : Set the timeout for ping scans in milliseconds. Default is 400ms. \n \n    --portscan-timeout : Set the timeout for port scans in milliseconds. Default is 400ms. \n \n    --full : Run complete mode, scanning for active IPs and open ports using all techniques. \n \n    --ping : Run only ping mode, scanning for active IPs. \n \n    --portscan : Run only portscan mode, scanning for open ports. \n \n    --ptr : Run PTR scan (reverse DNS lookup). \n \nNote: At least one IP option or CIDR option must be specified. Both options can be used simultaneously. The program will use default values for any unspecified options. \n \nExample usage: \n \n$ active-ip -i 192.168.0.1 -p 80,443 -v \n \nThis will scan the IP address 192.168.0.1 for open ports 80 and 443, and display verbose output.\n")
 }
 func showBanner(isSilent bool) {
-	printText(isSilent, "            _   _             _       \n  __ _  ___| |_(_)_   _____  (_)_ __  \n / _` |/ __| __| \\ \\ / / _ \\ | | '_ \\ \n| (_| | (__| |_| |\\ V /  __/ | | |_) |\n \\__,_|\\___|\\__|_| \\_/ \\___| |_| .__/ \n                               |_| \n    made by Ali Khakhali\n\n\n", "Print")
+	printText(isSilent, "            _   _             _       \n  __ _  ___| |_(_)_   _____  (_)_ __  \n / _` |/ __| __| \\ \\ / / _ \\ | | '_ \\ \n| (_| | (__| |_| |\\ V /  __/ | | |_) |\n \\__,_|\\___|\\__|_| \\_/ \\___| |_| .__/ \n                               |_| \n    Written by Ali Khalkhali\n    Github: https://github.com/Alikhalkhali/active-ip\n\n\n", "Print")
 }
 
 // Ping sends an ICMP echo request to the specified IP address and returns true
