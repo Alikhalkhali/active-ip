@@ -29,7 +29,9 @@ This will download and install the tool and its dependencies.
 
 Active-IP is a powerful tool that enables you to customize your scans in many ways. Here are some examples:
 
-- **note:** If you do not set the scanning technique flags, it will use the full technique, which includes port scanning, ping scanning (using ICMP), and PTR scanning. If you explicitly set all three scanning techniques, it will also use the full technique.
+### Note 
+- If you are using a Unix-based operating system, run the tool with a sudoer user, root, or using the sudo command.
+- If you do not set the scanning technique flags, it will use the full technique, which includes port scanning, ping scanning (using ICMP), and PTR scanning. If you explicitly set all three scanning techniques, it will also use the full technique.
 
 ### Basic Usage
 
