@@ -1,6 +1,6 @@
-<h1 align="center">
-    Table of Contents
-</h1>
+<h2 align="center" >
+  Table of Contents 
+</h2>
 <p align="center">
   <a href="#installation">installation</a> •
   <a href="#usage">usage</a> •
